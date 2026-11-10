@@ -1,37 +1,35 @@
 package com.example.ui.components
 
-import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.animation.core.tween
-import androidx.compose.foundation.Image
+import androidx.compose.animation.core.*
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.LocalDrink
-import androidx.compose.material.icons.filled.Undo
 import androidx.compose.material.icons.filled.WaterDrop
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.blur
+import androidx.compose.ui.draw.scale
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.drawscope.Fill
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.platform.testTag
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.example.R
 import com.example.data.UserSettings
 import com.example.data.WaterLog
 import java.util.Locale
+import kotlin.math.sin
 
 @Composable
 fun DrinkScreen(
@@ -40,320 +38,353 @@ fun DrinkScreen(
     onDrinkWater: (Int) -> Unit,
     onUndoLast: (Int) -> Unit
 ) {
+    val haptic = LocalHapticFeedback.current
     val totalDrunkMl = todayLogs.sumOf { it.amountMl }
     val totalDrunkLiters = totalDrunkMl / 1000f
     val goalMl = userSettings.totalGoalMl
-    val goalGlasses = userSettings.dailyGoalGlasses
     val glassSizeMl = userSettings.glassSizeMl
 
-    val glassesDrunk = totalDrunkMl / glassSizeMl
-    val remainingGlasses = (goalGlasses - glassesDrunk).coerceAtLeast(0)
     val progressFraction = (totalDrunkMl.toFloat() / goalMl.toFloat()).coerceIn(0f, 1f)
 
     val animatedProgress by animateFloatAsState(
         targetValue = progressFraction,
-        animationSpec = tween(durationMillis = 600),
+        animationSpec = tween(durationMillis = 1200, easing = EaseInOutCubic),
         label = "waterProgress"
     )
 
-    Column(
+    val glassesDrunk = (totalDrunkMl / glassSizeMl).coerceAtMost(userSettings.dailyGoalGlasses)
+
+    // Animation pour les bulles
+    val infiniteTransition = rememberInfiniteTransition(label = "bubbles")
+    val bubbleOffset by infiniteTransition.animateFloat(
+        initialValue = 0f,
+        targetValue = -100f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(3000, easing = LinearEasing),
+            repeatMode = RepeatMode.Restart
+        ),
+        label = "bubbleOffset"
+    )
+
+    // Animation du liquide (vagues)
+    val waveOffset by infiniteTransition.animateFloat(
+        initialValue = 0f,
+        targetValue = 6.28f, // 2 * PI
+        animationSpec = infiniteRepeatable(
+            animation = tween(2000, easing = LinearEasing),
+            repeatMode = RepeatMode.Restart
+        ),
+        label = "waveOffset"
+    )
+
+    Box(
         modifier = Modifier
             .fillMaxSize()
-            .verticalScroll(rememberScrollState())
-            .padding(horizontal = 20.dp, vertical = 24.dp),
-        verticalArrangement = Arrangement.spacedBy(24.dp),
-        horizontalAlignment = Alignment.CenterHorizontally
-    ) {
-        // 1. Status Card (Bonjour ! Il vous manque encore X verres...)
-        Card(
-            modifier = Modifier
-                .fillMaxWidth()
-                .border(4.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(20.dp))
-                .testTag("status_card"),
-            shape = RoundedCornerShape(20.dp),
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
-        ) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(24.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(20.dp)
-            ) {
-                // Circular progress visual / avatar
-                Box(
-                    modifier = Modifier
-                        .size(80.dp)
-                        .clip(CircleShape)
-                        .background(MaterialTheme.colorScheme.surfaceVariant)
-                        .border(4.dp, MaterialTheme.colorScheme.primary, CircleShape),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Image(
-                        painter = painterResource(id = R.drawable.img_setti_avatar_1786213952641),
-                        contentDescription = "Setti Avatar",
-                        modifier = Modifier.fillMaxSize(),
-                        contentScale = ContentScale.Crop
-                    )
-                }
-
-                Column(
-                    modifier = Modifier.weight(1f),
-                    verticalArrangement = Arrangement.spacedBy(6.dp)
-                ) {
-                    Text(
-                        text = "Bonjour !",
-                        style = MaterialTheme.typography.headlineMedium.copy(
-                            fontWeight = FontWeight.ExtraBold,
-                            color = MaterialTheme.colorScheme.primary
-                        )
-                    )
-
-                    if (remainingGlasses > 0) {
-                        Text(
-                            text = "Il vous manque encore $remainingGlasses verres pour atteindre votre objectif aujourd'hui.",
-                            style = MaterialTheme.typography.bodyLarge.copy(
-                                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                lineHeight = 28.sp
-                            )
-                        )
-                    } else {
-                        Text(
-                            text = "Objectif atteint ! Bravo pour votre excellente hydratation ! 🎉",
-                            style = MaterialTheme.typography.bodyLarge.copy(
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.secondary,
-                                lineHeight = 28.sp
-                            )
-                        )
-                    }
-                }
-            }
-        }
-
-        // 2. Main Progress Display (Consommation actuelle)
-        Card(
-            modifier = Modifier
-                .fillMaxWidth()
-                .border(4.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(24.dp))
-                .testTag("progress_display_card"),
-            shape = RoundedCornerShape(24.dp),
-            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)
-        ) {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(horizontal = 24.dp, vertical = 32.dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(20.dp)
-            ) {
-                Text(
-                    text = "Consommation actuelle",
-                    style = MaterialTheme.typography.headlineSmall.copy(
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                        fontWeight = FontWeight.Bold
+            .background(
+                Brush.verticalGradient(
+                    colors = listOf(
+                        Color(0xFFE3F2FD),
+                        Color(0xFFBBDEFB),
+                        Color(0xFF90CAF9)
                     )
                 )
-
-                // Liters counter display
-                Row(
-                    verticalAlignment = Alignment.Bottom,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    Text(
-                        text = String.format(Locale.getDefault(), "%.2f", totalDrunkLiters),
-                        style = MaterialTheme.typography.displayLarge.copy(
-                            fontWeight = FontWeight.Black,
-                            fontSize = 72.sp,
-                            color = MaterialTheme.colorScheme.primary
-                        ),
-                        modifier = Modifier.testTag("liters_display_text")
-                    )
-                    Text(
-                        text = "Litres",
-                        style = MaterialTheme.typography.headlineMedium.copy(
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.primary
-                        ),
-                        modifier = Modifier.padding(bottom = 12.dp)
-                    )
-                }
-
-                // Thick High-Contrast Progress Bar
-                Box(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .height(48.dp)
-                        .clip(CircleShape)
-                        .background(MaterialTheme.colorScheme.surfaceVariant)
-                        .border(4.dp, MaterialTheme.colorScheme.primary, CircleShape)
-                ) {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxHeight()
-                            .fillMaxWidth(animatedProgress)
-                            .background(MaterialTheme.colorScheme.secondary)
-                    )
-                }
-
-                // Progress Labels
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        text = "Start",
-                        style = MaterialTheme.typography.labelLarge.copy(
-                            color = MaterialTheme.colorScheme.onSurface,
-                            fontWeight = FontWeight.Bold
-                        )
-                    )
-                    Text(
-                        text = "Objectif : $goalGlasses Verres (${String.format(Locale.getDefault(), "%.1f", userSettings.totalGoalLiters)}L)",
-                        style = MaterialTheme.typography.labelLarge.copy(
-                            color = MaterialTheme.colorScheme.onSurface,
-                            fontWeight = FontWeight.Bold
-                        )
-                    )
-                }
-            }
-        }
-
-        // 3. Primary Action Button: "Boire un Verre (+250ml)"
-        Button(
-            onClick = { onDrinkWater(glassSizeMl) },
-            modifier = Modifier
-                .fillMaxWidth()
-                .height(96.dp)
-                .testTag("btn_boire_un_verre"),
-            shape = RoundedCornerShape(24.dp),
-            colors = ButtonDefaults.buttonColors(
-                containerColor = MaterialTheme.colorScheme.primary,
-                contentColor = MaterialTheme.colorScheme.onPrimary
             ),
-            border = androidx.compose.foundation.BorderStroke(4.dp, MaterialTheme.colorScheme.primary),
-            elevation = ButtonDefaults.buttonElevation(defaultElevation = 8.dp)
-        ) {
-            Row(
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(16.dp)
-            ) {
-                Icon(
-                    imageVector = Icons.Default.LocalDrink,
-                    contentDescription = null,
-                    modifier = Modifier.size(48.dp)
-                )
-
-                Column(
-                    horizontalAlignment = Alignment.Start
-                ) {
-                    Text(
-                        text = "Boire un Verre",
-                        style = MaterialTheme.typography.headlineMedium.copy(
-                            fontWeight = FontWeight.Black,
-                            fontSize = 28.sp
-                        )
-                    )
-                    Text(
-                        text = "+ ${glassSizeMl}ml",
-                        style = MaterialTheme.typography.titleLarge.copy(
-                            fontWeight = FontWeight.SemiBold,
-                            color = MaterialTheme.colorScheme.onPrimary.copy(alpha = 0.85f)
-                        )
-                    )
-                }
-            }
-        }
-
-        // 4. Quick Add Presets (+100ml, +250ml, +500ml)
+        contentAlignment = Alignment.Center
+    ) {
         Column(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.spacedBy(12.dp)
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(24.dp),
+            verticalArrangement = Arrangement.SpaceEvenly,
+            horizontalAlignment = Alignment.CenterHorizontally
         ) {
+            // Titre élégant
             Text(
-                text = "Autres formats rapides :",
-                style = MaterialTheme.typography.titleLarge.copy(
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.primary
+                text = "Setti",
+                style = MaterialTheme.typography.displayLarge.copy(
+                    fontWeight = FontWeight.Black,
+                    fontSize = 64.sp,
+                    color = Color.White,
+                    shadow = androidx.compose.ui.graphics.Shadow(
+                        color = Color(0xFF1565C0),
+                        offset = Offset(4f, 6f),
+                        blurRadius = 12f
+                    )
                 )
             )
 
+            Spacer(modifier = Modifier.height(8.dp))
+
+            // Message d'encouragement
+            Text(
+                text = if (progressFraction >= 1f) "🎉 Objectif atteint !"
+                      else if (progressFraction >= 0.7f) "Continue comme ça ! 💪"
+                      else if (progressFraction >= 0.4f) "Bon courage ! 💧"
+                      else "N'oublie pas de boire ! 💙",
+                style = MaterialTheme.typography.titleLarge.copy(
+                    fontWeight = FontWeight.Medium,
+                    fontSize = 22.sp,
+                    color = Color.White.copy(alpha = 0.95f)
+                )
+            )
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // Compteur visuel moderne avec cartes
             Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 8.dp),
+                horizontalArrangement = Arrangement.Center,
+                verticalAlignment = Alignment.CenterVertically
             ) {
-                listOf(
-                    Pair(100, "Petit verre\n100ml"),
-                    Pair(250, "Verre std\n250ml"),
-                    Pair(500, "Gourde\n500ml")
-                ).forEach { (amount, label) ->
-                    Card(
+                repeat(userSettings.dailyGoalGlasses.coerceAtMost(10)) { index ->
+                    Box(
                         modifier = Modifier
-                            .weight(1f)
-                            .height(84.dp)
-                            .clickable { onDrinkWater(amount) }
-                            .border(3.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(16.dp))
-                            .testTag("preset_$amount"),
-                        shape = RoundedCornerShape(16.dp),
-                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant)
+                            .padding(horizontal = 4.dp)
+                            .size(if (index < glassesDrunk) 52.dp else 48.dp)
+                            .shadow(
+                                elevation = if (index < glassesDrunk) 8.dp else 2.dp,
+                                shape = RoundedCornerShape(12.dp)
+                            )
+                            .background(
+                                if (index < glassesDrunk)
+                                    Brush.verticalGradient(
+                                        colors = listOf(
+                                            Color(0xFF42A5F5),
+                                            Color(0xFF1E88E5)
+                                        )
+                                    )
+                                else
+                                    Brush.verticalGradient(
+                                        colors = listOf(
+                                            Color.White.copy(alpha = 0.9f),
+                                            Color.White.copy(alpha = 0.7f)
+                                        )
+                                    ),
+                                shape = RoundedCornerShape(12.dp)
+                            ),
+                        contentAlignment = Alignment.Center
                     ) {
-                        Column(
-                            modifier = Modifier
-                                .fillMaxSize()
-                                .padding(8.dp),
-                            horizontalAlignment = Alignment.CenterHorizontally,
-                            verticalArrangement = Arrangement.Center
-                        ) {
-                            Icon(
-                                imageVector = Icons.Default.WaterDrop,
-                                contentDescription = null,
-                                tint = MaterialTheme.colorScheme.primary,
-                                modifier = Modifier.size(24.dp)
-                            )
-                            Text(
-                                text = label,
-                                style = MaterialTheme.typography.labelMedium.copy(
-                                    fontWeight = FontWeight.Bold,
-                                    fontSize = 14.sp,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    textAlign = TextAlign.Center
-                                )
-                            )
-                        }
+                        Icon(
+                            imageVector = Icons.Default.WaterDrop,
+                            contentDescription = null,
+                            tint = if (index < glassesDrunk) Color.White else Color(0xFFBBDEFB),
+                            modifier = Modifier.size(if (index < glassesDrunk) 28.dp else 24.dp)
+                        )
                     }
                 }
             }
-        }
 
-        // Undo option if logs exist
-        if (todayLogs.isNotEmpty()) {
-            OutlinedButton(
-                onClick = { onUndoLast(todayLogs.first().id) },
+            Spacer(modifier = Modifier.height(8.dp))
+
+            // Verre d'eau 3D réaliste avec animations
+            Box(
                 modifier = Modifier
-                    .fillMaxWidth()
-                    .height(56.dp)
-                    .border(2.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(16.dp))
-                    .testTag("btn_undo_last"),
-                shape = RoundedCornerShape(16.dp)
+                    .size(300.dp, 420.dp),
+                contentAlignment = Alignment.Center
             ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp)
-                ) {
-                    Icon(
-                        imageVector = Icons.Default.Undo,
-                        contentDescription = null,
-                        tint = MaterialTheme.colorScheme.primary
-                    )
-                    Text(
-                        text = "Annuler la dernière prise (${todayLogs.first().amountMl}ml)",
-                        style = MaterialTheme.typography.bodyLarge.copy(
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.primary
+                // Ombre du verre
+                Box(
+                    modifier = Modifier
+                        .size(280.dp, 400.dp)
+                        .offset(y = 10.dp)
+                        .blur(20.dp)
+                        .background(
+                            Color.Black.copy(alpha = 0.15f),
+                            RoundedCornerShape(32.dp)
                         )
+                )
+
+                // Verre principal avec effet glassmorphism
+                Box(
+                    modifier = Modifier
+                        .size(280.dp, 400.dp)
+                        .shadow(24.dp, RoundedCornerShape(32.dp))
+                        .background(
+                            Brush.linearGradient(
+                                colors = listOf(
+                                    Color.White.copy(alpha = 0.4f),
+                                    Color.White.copy(alpha = 0.2f)
+                                )
+                            ),
+                            RoundedCornerShape(32.dp)
+                        )
+                ) {
+                    // Eau avec animation de vagues
+                    Canvas(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(12.dp)
+                    ) {
+                        val waterHeight = size.height * animatedProgress
+                        val waterTop = size.height - waterHeight
+
+                        // Dessiner l'eau avec effet de vagues
+                        val path = Path().apply {
+                            moveTo(0f, size.height)
+                            lineTo(0f, waterTop)
+
+                            // Créer des vagues
+                            val waveWidth = size.width / 4
+                            var x = 0f
+                            while (x < size.width) {
+                                val y = waterTop + sin((x / waveWidth + waveOffset) * 2) * 8f
+                                lineTo(x, y)
+                                x += 5f
+                            }
+
+                            lineTo(size.width, waterTop)
+                            lineTo(size.width, size.height)
+                            close()
+                        }
+
+                        drawPath(
+                            path = path,
+                            brush = Brush.verticalGradient(
+                                colors = listOf(
+                                    Color(0xFF2196F3),
+                                    Color(0xFF1976D2),
+                                    Color(0xFF1565C0)
+                                ),
+                                startY = waterTop,
+                                endY = size.height
+                            ),
+                            style = Fill
+                        )
+
+                        // Bulles animées
+                        if (animatedProgress > 0.1f) {
+                            repeat(5) { index ->
+                                val bubbleX = size.width * (index + 1) / 6f
+                                val bubbleY = waterTop + (bubbleOffset % 100) + (index * 20f)
+                                if (bubbleY < size.height && bubbleY > waterTop) {
+                                    drawCircle(
+                                        color = Color.White.copy(alpha = 0.5f),
+                                        radius = (4 + index).dp.toPx(),
+                                        center = Offset(bubbleX, bubbleY)
+                                    )
+                                }
+                            }
+                        }
+                    }
+
+                    // Reflet du verre
+                    Canvas(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .padding(12.dp)
+                    ) {
+                        drawRect(
+                            brush = Brush.linearGradient(
+                                colors = listOf(
+                                    Color.White.copy(alpha = 0.3f),
+                                    Color.Transparent
+                                ),
+                                start = Offset(0f, 0f),
+                                end = Offset(size.width * 0.3f, size.height * 0.3f)
+                            )
+                        )
+                    }
+
+                    // Texte des litres par-dessus
+                    Box(
+                        modifier = Modifier.fillMaxSize(),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(
+                            text = String.format(Locale.getDefault(), "%.1f L", totalDrunkLiters),
+                            style = MaterialTheme.typography.displayLarge.copy(
+                                fontWeight = FontWeight.Black,
+                                fontSize = 72.sp,
+                                color = if (progressFraction > 0.5f) Color.White else Color(0xFF1565C0),
+                                shadow = androidx.compose.ui.graphics.Shadow(
+                                    color = Color.Black.copy(alpha = 0.3f),
+                                    offset = Offset(4f, 4f),
+                                    blurRadius = 8f
+                                )
+                            )
+                        )
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(16.dp))
+
+            // Bouton moderne avec effet 3D
+            var isPressed by remember { mutableStateOf(false) }
+            val scale by animateFloatAsState(
+                targetValue = if (isPressed) 0.95f else 1f,
+                animationSpec = spring(dampingRatio = 0.5f, stiffness = 500f),
+                label = "buttonScale"
+            )
+
+            Button(
+                onClick = {
+                    haptic.performHapticFeedback(HapticFeedbackType.LongPress)
+                    onDrinkWater(glassSizeMl)
+                },
+                modifier = Modifier
+                    .fillMaxWidth(0.9f)
+                    .height(130.dp)
+                    .scale(scale)
+                    .shadow(
+                        elevation = if (isPressed) 8.dp else 20.dp,
+                        shape = RoundedCornerShape(40.dp),
+                        spotColor = Color(0xFF1976D2).copy(alpha = 0.5f)
                     )
+                    .testTag("btn_boire_un_verre"),
+                shape = RoundedCornerShape(40.dp),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = Color(0xFF2196F3),
+                    contentColor = Color.White
+                ),
+                elevation = ButtonDefaults.buttonElevation(
+                    defaultElevation = 16.dp,
+                    pressedElevation = 8.dp
+                ),
+                contentPadding = PaddingValues(0.dp)
+            ) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(
+                            Brush.verticalGradient(
+                                colors = listOf(
+                                    Color(0xFF42A5F5),
+                                    Color(0xFF2196F3),
+                                    Color(0xFF1976D2)
+                                )
+                            ),
+                            shape = RoundedCornerShape(40.dp)
+                        ),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(16.dp)
+                    ) {
+                        Text(
+                            text = "🥤",
+                            style = MaterialTheme.typography.displayLarge.copy(fontSize = 56.sp)
+                        )
+                        Text(
+                            text = "J'AI BU",
+                            style = MaterialTheme.typography.displayLarge.copy(
+                                fontWeight = FontWeight.Black,
+                                fontSize = 56.sp,
+                                shadow = androidx.compose.ui.graphics.Shadow(
+                                    color = Color.Black.copy(alpha = 0.3f),
+                                    offset = Offset(2f, 4f),
+                                    blurRadius = 8f
+                                )
+                            )
+                        )
+                        Text(
+                            text = "💧",
+                            style = MaterialTheme.typography.displayLarge.copy(fontSize = 56.sp)
+                        )
+                    }
                 }
             }
         }

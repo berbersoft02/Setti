@@ -7,11 +7,9 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Notifications
 import androidx.compose.material.icons.filled.Person
-import androidx.compose.material.icons.filled.Remove
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -34,11 +32,10 @@ fun SettingsScreen(
     onSaveSettings: (UserSettings) -> Unit
 ) {
     var glassCount by remember(userSettings) { mutableStateOf(userSettings.dailyGoalGlasses) }
+    var glassSizeMl by remember(userSettings) { mutableStateOf(userSettings.glassSizeMl) }
     var userName by remember(userSettings) { mutableStateOf(userSettings.userName) }
     var reminderEnabled by remember(userSettings) { mutableStateOf(userSettings.reminderEnabled) }
     var reminderIntervalMinutes by remember(userSettings) { mutableStateOf(userSettings.reminderIntervalMinutes) }
-
-    val calculatedLiters = (glassCount * userSettings.glassSizeMl) / 1000f
 
     Column(
         modifier = Modifier
@@ -97,90 +94,37 @@ fun SettingsScreen(
             )
         }
 
-        // Giant Stepper Component: [-] [ 8 Verres ] [+]
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(vertical = 8.dp),
-            horizontalArrangement = Arrangement.spacedBy(16.dp),
-            verticalAlignment = Alignment.CenterVertically
+        // Goal Stepper (reusable component)
+        Stepper(
+            value = glassCount,
+            onValueChange = { glassCount = it },
+            min = 1,
+            max = 25,
+            formatValue = { glasses ->
+                "Verres (${String.format(Locale.getDefault(), "%.1f", glasses * glassSizeMl / 1000f)}L)"
+            }
+        )
+
+        // Glass Size Section
+        Column(
+            modifier = Modifier.fillMaxWidth(),
+            verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
-            // Decrease Button (-)
-            Button(
-                onClick = { if (glassCount > 1) glassCount-- },
-                modifier = Modifier
-                    .weight(1f)
-                    .height(110.dp)
-                    .border(4.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(20.dp))
-                    .testTag("btn_decrease_glasses"),
-                shape = RoundedCornerShape(20.dp),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = MaterialTheme.colorScheme.surface,
-                    contentColor = MaterialTheme.colorScheme.primary
-                ),
-                enabled = glassCount > 1
-            ) {
-                Icon(
-                    imageVector = Icons.Default.Remove,
-                    contentDescription = "Diminuer les verres",
-                    modifier = Modifier.size(48.dp)
+            Text(
+                text = "Taille de votre verre",
+                style = MaterialTheme.typography.titleLarge.copy(
+                    fontWeight = FontWeight.Bold,
+                    color = MaterialTheme.colorScheme.primary
                 )
-            }
-
-            // Value Display Box
-            Card(
-                modifier = Modifier
-                    .weight(1.8f)
-                    .height(130.dp)
-                    .border(4.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(20.dp)),
-                shape = RoundedCornerShape(20.dp),
-                colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.primaryContainer)
-            ) {
-                Column(
-                    modifier = Modifier.fillMaxSize(),
-                    horizontalAlignment = Alignment.CenterHorizontally,
-                    verticalArrangement = Arrangement.Center
-                ) {
-                    Text(
-                        text = "$glassCount",
-                        style = MaterialTheme.typography.displayLarge.copy(
-                            fontWeight = FontWeight.Black,
-                            fontSize = 64.sp,
-                            color = MaterialTheme.colorScheme.onPrimaryContainer
-                        ),
-                        modifier = Modifier.testTag("glass_count_display")
-                    )
-                    Text(
-                        text = "Verres (${String.format(Locale.getDefault(), "%.1f", calculatedLiters)}L)",
-                        style = MaterialTheme.typography.titleLarge.copy(
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onPrimaryContainer
-                        )
-                    )
-                }
-            }
-
-            // Increase Button (+)
-            Button(
-                onClick = { if (glassCount < 25) glassCount++ },
-                modifier = Modifier
-                    .weight(1f)
-                    .height(110.dp)
-                    .border(4.dp, MaterialTheme.colorScheme.primary, RoundedCornerShape(20.dp))
-                    .testTag("btn_increase_glasses"),
-                shape = RoundedCornerShape(20.dp),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = MaterialTheme.colorScheme.surface,
-                    contentColor = MaterialTheme.colorScheme.primary
-                ),
-                enabled = glassCount < 25
-            ) {
-                Icon(
-                    imageVector = Icons.Default.Add,
-                    contentDescription = "Augmenter les verres",
-                    modifier = Modifier.size(48.dp)
-                )
-            }
+            )
+            Stepper(
+                value = glassSizeMl,
+                onValueChange = { glassSizeMl = it },
+                min = 100,
+                max = 500,
+                step = 50,
+                formatValue = { "$it ml" }
+            )
         }
 
         // Additional Customization Options
@@ -309,6 +253,7 @@ fun SettingsScreen(
             onClick = {
                 val updated = userSettings.copy(
                     dailyGoalGlasses = glassCount,
+                    glassSizeMl = glassSizeMl,
                     userName = userName,
                     reminderEnabled = reminderEnabled,
                     reminderIntervalMinutes = reminderIntervalMinutes

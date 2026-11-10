@@ -1,10 +1,15 @@
 package com.example
 
+import android.Manifest
+import android.content.pm.PackageManager
+import android.os.Build
 import android.os.Bundle
 import android.widget.Toast
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
@@ -17,10 +22,13 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.core.content.ContextCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.ui.components.DrinkScreen
+import com.example.ui.components.DrinkScreeniOS
 import com.example.ui.components.HistoryScreen
+import com.example.ui.components.OnboardingScreenNew
 import com.example.ui.components.ReminderDialog
 import com.example.ui.components.SettiBottomNavBar
 import com.example.ui.components.SettiHeader
@@ -59,49 +67,39 @@ fun SettiFlowApp(viewModel: WaterViewModel = viewModel()) {
         }
     }
 
+    // Request notification permission once on launch (Android 13+).
+    val notificationPermissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { /* Permission state is checked again before posting notifications. */ }
+
+    LaunchedEffect(Unit) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+            ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS)
+            != PackageManager.PERMISSION_GRANTED
+        ) {
+            notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+        }
+    }
+
+    if (!userSettings.onboardingCompleted) {
+        OnboardingScreenNew(onComplete = { settings -> viewModel.finishOnboarding(settings) })
+        return
+    }
+
     Scaffold(
-        modifier = Modifier.fillMaxSize(),
-        topBar = {
-            SettiHeader(
-                activeTab = activeTab,
-                onTabSelected = { viewModel.setActiveTab(it) },
-                onOpenReminder = { viewModel.openReminderDialog() }
-            )
-        },
-        bottomBar = {
-            SettiBottomNavBar(
-                selectedTab = activeTab,
-                onTabSelected = { viewModel.setActiveTab(it) }
-            )
-        },
-        snackbarHost = { SnackbarHost(hostState = snackbarHostState) }
+        modifier = Modifier.fillMaxSize()
     ) { innerPadding ->
         Box(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(innerPadding)
         ) {
-            when (activeTab) {
-                0 -> DrinkScreen(
-                    userSettings = userSettings,
-                    todayLogs = todayLogs,
-                    onDrinkWater = { amount -> viewModel.drinkWater(amount) },
-                    onUndoLast = { id -> viewModel.removeLog(id) }
-                )
-                1 -> HistoryScreen(
-                    userSettings = userSettings,
-                    allLogs = allLogs,
-                    onDeleteLog = { id -> viewModel.removeLog(id) },
-                    onAddCustomLog = { amount -> viewModel.drinkWater(amount) }
-                )
-                2 -> SettingsScreen(
-                    userSettings = userSettings,
-                    onSaveSettings = { settings ->
-                        viewModel.updateSettings(settings)
-                        viewModel.setActiveTab(0)
-                    }
-                )
-            }
+            DrinkScreeniOS(
+                userSettings = userSettings,
+                todayLogs = todayLogs,
+                onDrinkWater = { amount -> viewModel.drinkWater(amount) },
+                onUndoLast = { id -> viewModel.removeLog(id) }
+            )
         }
     }
 

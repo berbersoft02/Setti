@@ -7,6 +7,7 @@ import com.example.data.AppDatabase
 import com.example.data.UserSettings
 import com.example.data.WaterLog
 import com.example.data.WaterRepository
+import com.example.notifications.ReminderScheduler
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -61,6 +62,13 @@ class WaterViewModel(application: Application) : AndroidViewModel(application) {
                 started = SharingStarted.WhileSubscribed(5000),
                 initialValue = emptyList()
             )
+
+        // Keep scheduled water reminders in sync with the stored settings.
+        viewModelScope.launch {
+            repository.getUserSettings().collect { settings ->
+                settings?.let { ReminderScheduler.schedule(getApplication(), it) }
+            }
+        }
     }
 
     fun setActiveTab(tabIndex: Int) {
@@ -112,7 +120,15 @@ class WaterViewModel(application: Application) : AndroidViewModel(application) {
 
     fun snoozeReminder() {
         _showReminderDialog.value = false
+        ReminderScheduler.snooze(getApplication())
         _toastMessage.value = "Rappel décalé de 30 minutes ⏰"
+    }
+
+    fun finishOnboarding(settings: UserSettings) {
+        viewModelScope.launch {
+            repository.updateSettings(settings.copy(onboardingCompleted = true))
+            _activeTab.value = 0
+        }
     }
 
     fun clearToast() {
