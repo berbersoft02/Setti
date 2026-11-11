@@ -14,6 +14,7 @@ import com.example.R
 import com.example.MainActivity
 import com.example.data.AppDatabase
 import com.example.data.UserSettings
+import java.util.Calendar
 
 class WaterReminderWorker(appContext: Context, params: WorkerParameters) :
     CoroutineWorker(appContext, params) {
@@ -36,20 +37,8 @@ class WaterReminderWorker(appContext: Context, params: WorkerParameters) :
     }
 
     private fun isQuietHours(settings: UserSettings): Boolean {
-        val calendar = java.util.Calendar.getInstance()
-        val currentHour = calendar.get(java.util.Calendar.HOUR_OF_DAY)
-
-        val start = settings.quietHoursStart // 21h
-        val end = settings.quietHoursEnd // 9h
-
-        // Quiet hours span across midnight (21h to 9h)
-        return if (start > end) {
-            // If current time is >= 21h OR < 9h, it's quiet hours
-            currentHour >= start || currentHour < end
-        } else {
-            // Normal range (e.g., 22h to 7h)
-            currentHour >= start && currentHour < end
-        }
+        val currentHour = Calendar.getInstance().get(Calendar.HOUR_OF_DAY)
+        return settings.isInQuietHours(currentHour)
     }
 
     private fun hasNotificationPermission(): Boolean {
