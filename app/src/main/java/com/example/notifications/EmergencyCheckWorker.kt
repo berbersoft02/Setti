@@ -7,6 +7,7 @@ import android.telephony.SmsManager
 import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
 import com.example.data.AppDatabase
+import java.util.Calendar
 import java.util.concurrent.TimeUnit
 
 class EmergencyCheckWorker(appContext: Context, params: WorkerParameters) :
@@ -33,8 +34,8 @@ class EmergencyCheckWorker(appContext: Context, params: WorkerParameters) :
         val hoursSinceLastDrink = TimeUnit.MILLISECONDS.toHours(currentTime - lastLogTime)
 
         // If no water for 6+ hours during waking hours, send alert
-        val currentHour = java.util.Calendar.getInstance().get(java.util.Calendar.HOUR_OF_DAY)
-        val isAwakeTime = currentHour >= settings.quietHoursEnd && currentHour < settings.quietHoursStart
+        val currentHour = Calendar.getInstance().get(Calendar.HOUR_OF_DAY)
+        val isAwakeTime = !settings.isInQuietHours(currentHour)
 
         if (hoursSinceLastDrink >= 6 && isAwakeTime) {
             sendEmergencySMS(settings.emergencyContactPhone, settings.userName, hoursSinceLastDrink)
