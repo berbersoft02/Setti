@@ -5,6 +5,7 @@ Android application for scheduled hydration monitoring with offline data persist
 ## Features
 
 * Hydration Tracking: Log water intake with customizable volume presets.
+* Streak & Consistency Analytics: Real-time calculation of daily goals, streaks, averages, and completion metrics.
 * Voice and Visual Alarms: Full-screen reminders using Android Text-to-Speech (TTS).
 * Background Scheduling: Managed via Android WorkManager and AlarmManager.
 * Caregiver Notifications: Automated SMS alerts if hydration thresholds are missed during active hours.
@@ -22,8 +23,10 @@ ViewModel Layer
   └── WaterViewModel
         │ Coroutines
         ▼
-Repository Layer
-  └── WaterRepository, UserSettings
+Domain & Repository Layer
+  ├── HydrationAnalytics (daily summaries, streaks, safety triggers)
+  ├── UserSettings
+  └── WaterRepository
         │
         ├── Persistence (Room Database: AppDatabase, WaterDao, WaterLog)
         └── Background Operations (ReminderScheduler, WaterReminderWorker, EmergencyCheckWorker)

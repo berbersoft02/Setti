@@ -1,14 +1,12 @@
 package com.example.notifications
 
-import android.app.PendingIntent
 import android.content.Context
-import android.content.Intent
 import android.telephony.SmsManager
 import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
 import com.example.data.AppDatabase
+import com.example.data.HydrationAnalytics
 import java.util.Calendar
-import java.util.concurrent.TimeUnit
 
 class EmergencyCheckWorker(appContext: Context, params: WorkerParameters) :
     CoroutineWorker(appContext, params) {
@@ -17,37 +15,21 @@ class EmergencyCheckWorker(appContext: Context, params: WorkerParameters) :
         val dao = AppDatabase.getDatabase(applicationContext).waterDao()
         val settings = dao.getUserSettingsDirect() ?: return Result.success()
 
-        // Check if emergency contact is configured
-        if (settings.emergencyContactPhone.isBlank()) {
-            return Result.success()
-        }
-
-        // Get last water log timestamp
         val logs = dao.getAllLogsDirect()
-        if (logs.isEmpty()) {
-            // No logs yet, skip
-            return Result.success()
-        }
-
-        val lastLogTime = logs.first().timestamp
         val currentTime = System.currentTimeMillis()
-        val hoursSinceLastDrink = TimeUnit.MILLISECONDS.toHours(currentTime - lastLogTime)
-
-        // If no water for 6+ hours during waking hours, send alert
         val currentHour = Calendar.getInstance().get(Calendar.HOUR_OF_DAY)
-        val isAwakeTime = !settings.isInQuietHours(currentHour)
 
-        if (hoursSinceLastDrink >= 6 && isAwakeTime) {
-            sendEmergencySMS(settings.emergencyContactPhone, settings.userName, hoursSinceLastDrink)
+        if (HydrationAnalytics.shouldTriggerEmergencyAlert(currentTime, currentHour, settings, logs)) {
+            val hours = HydrationAnalytics.calculateHoursSinceLastDrink(currentTime, logs) ?: 6L
+            val message = HydrationAnalytics.generateEmergencySmsMessage(settings.userName, hours)
+            sendEmergencySMS(settings.emergencyContactPhone, message)
         }
 
         return Result.success()
     }
 
-    private fun sendEmergencySMS(phoneNumber: String, userName: String, hours: Long) {
+    private fun sendEmergencySMS(phoneNumber: String, message: String) {
         try {
-            val message = "⚠️ ALERTE HYDRATATION: $userName n'a pas bu d'eau depuis $hours heures. Merci de vérifier."
-
             val smsManager = SmsManager.getDefault()
             smsManager.sendTextMessage(
                 phoneNumber,
