@@ -21,6 +21,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.example.data.HydrationAnalytics
 import com.example.data.UserSettings
 import com.example.data.WaterLog
 import java.text.SimpleDateFormat
@@ -42,6 +43,9 @@ fun HistoryScreen(
     val totalTodayMl = todayLogs.sumOf { it.amountMl }
     val targetMl = userSettings.totalGoalMl
     val isGoalAchieved = totalTodayMl >= targetMl
+    val stats = remember(allLogs, targetMl, todayStr) {
+        HydrationAnalytics.computeStats(allLogs, targetMl, todayStr)
+    }
 
     Column(
         modifier = Modifier
@@ -152,6 +156,99 @@ fun HistoryScreen(
                         Spacer(modifier = Modifier.width(6.dp))
                         Text("Ajouter", style = MaterialTheme.typography.labelLarge)
                     }
+                }
+            }
+        }
+
+        // Streak & Weekly Statistics Card
+        Card(
+            modifier = Modifier
+                .fillMaxWidth()
+                .border(2.dp, MaterialTheme.colorScheme.outlineVariant, RoundedCornerShape(16.dp))
+                .testTag("history_stats_card"),
+            shape = RoundedCornerShape(16.dp),
+            colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f))
+        ) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 16.dp, vertical = 12.dp),
+                horizontalArrangement = Arrangement.SpaceAround,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                // Streak Item
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(2.dp)
+                ) {
+                    Text(
+                        text = "🔥 ${stats.currentStreakDays} j",
+                        style = MaterialTheme.typography.titleMedium.copy(
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.primary
+                        ),
+                        modifier = Modifier.testTag("streak_count")
+                    )
+                    Text(
+                        text = "Série actuelle",
+                        style = MaterialTheme.typography.bodySmall.copy(
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    )
+                }
+
+                Box(
+                    modifier = Modifier
+                        .height(32.dp)
+                        .width(1.dp)
+                        .background(MaterialTheme.colorScheme.outlineVariant)
+                )
+
+                // Daily Average
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(2.dp)
+                ) {
+                    Text(
+                        text = "${stats.averageDailyMl} ml",
+                        style = MaterialTheme.typography.titleMedium.copy(
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                    )
+                    Text(
+                        text = "Moyenne / j",
+                        style = MaterialTheme.typography.bodySmall.copy(
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    )
+                }
+
+                Box(
+                    modifier = Modifier
+                        .height(32.dp)
+                        .width(1.dp)
+                        .background(MaterialTheme.colorScheme.outlineVariant)
+                )
+
+                // Completion Rate
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(2.dp)
+                ) {
+                    Text(
+                        text = "${stats.completionRatePercent}%",
+                        style = MaterialTheme.typography.titleMedium.copy(
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.secondary
+                        )
+                    )
+                    Text(
+                        text = "Objectif réussi",
+                        style = MaterialTheme.typography.bodySmall.copy(
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    )
                 }
             }
         }

@@ -6,6 +6,7 @@ SettiFlow is architected using modern Android best practices, following Google's
 
 * **UI Layer:** Built with Jetpack Compose & Material 3 (`DrinkScreen`, `HistoryScreen`).
 * **ViewModel:** `WaterViewModel` exposing observable UI state via Kotlin StateFlow.
+* **Domain Layer:** Pure Kotlin models and analytics engine (`HydrationAnalytics`, `DailyHydrationSummary`, `HydrationStats`, `HydrationStatus`, `UserSettings`).
 * **Repository Layer:** `WaterRepository` coordinating between local database and notifications.
 * **Persistence Layer:** Room Database (`AppDatabase`, `WaterDao`, `WaterLog`).
 
